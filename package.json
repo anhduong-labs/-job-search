@@ -1,0 +1,13 @@
+{
+  "name": "job-scanner-playwright",
+  "version": "1.0.0",
+  "description": "Web3 job scanner with Playwright",
+  "main": "scripts/crawl_playwright.js",
+  "scripts": {
+    "crawl": "node scripts/crawl_playwright.js",
+    "test": "node scripts/test_crawl.js"
+  },
+  "dependencies": {
+    "playwright": "^1.48.0"
+  }
+}

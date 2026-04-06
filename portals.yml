@@ -1,0 +1,120 @@
+# Portals Configuration - Web3/Crypto Companies
+# Used by crawl_playwright.js to crawl company careers pages
+
+tracked_companies:
+  # -- Major Exchanges --
+  
+  - name: Binance
+    careers_url: https://jobs.lever.co/binance
+    enabled: true
+    notes: "Lever, not Greenhouse"
+    
+  - name: Coinbase
+    careers_url: https://job-boards.greenhouse.io/coinbase
+    enabled: true
+    
+  - name: OKX
+    careers_url: https://job-boards.greenhouse.io/okx
+    enabled: true
+    
+  - name: Bybit
+    careers_url: https://careers.bybit.com/jobs
+    enabled: false  # No standard ATS, skip for now
+    
+  - name: Kraken
+    careers_url: https://jobs.lever.co/kraken
+    enabled: true
+  
+  # -- L1/L2 Blockchains --
+  
+  - name: Polygon Labs
+    careers_url: https://job-boards.greenhouse.io/polygontechnology
+    enabled: true
+    
+  - name: Arbitrum
+    careers_url: https://job-boards.greenhouse.io/offchainlabs
+    enabled: true
+    
+  - name: Optimism
+    careers_url: https://job-boards.greenhouse.io/optimism
+    enabled: true
+    
+  - name: Scroll
+    careers_url: https://jobs.ashbyhq.com/scroll
+    enabled: true
+    
+  - name: zkSync
+    careers_url: https://job-boards.greenhouse.io/matterlabs
+    enabled: true
+    
+  - name: Starknet
+    careers_url: https://job-boards.greenhouse.io/starkware
+    enabled: true
+  
+  # -- DeFi Protocols --
+  
+  - name: Uniswap Labs
+    careers_url: https://jobs.lever.co/uniswaplabs
+    enabled: true
+    
+  - name: Aave
+    careers_url: https://jobs.lever.co/aave
+    enabled: true
+    
+  - name: Curve Finance
+    careers_url: https://job-boards.greenhouse.io/curvefi
+    enabled: false  # Check if exists
+    
+  - name: dYdX
+    careers_url: https://job-boards.greenhouse.io/dydx
+    enabled: true
+    
+  - name: 1inch
+    careers_url: https://job-boards.greenhouse.io/1inch
+    enabled: true
+  
+  # -- Infra & Tooling --
+  
+  - name: Consensys
+    careers_url: https://job-boards.greenhouse.io/consensys
+    enabled: true
+    
+  - name: Alchemy
+    careers_url: https://job-boards.greenhouse.io/alchemy
+    enabled: true
+    
+  - name: Chainlink
+    careers_url: https://jobs.lever.co/chainlink
+    enabled: true
+    
+  - name: The Graph
+    careers_url: https://job-boards.greenhouse.io/thegraph
+    enabled: true
+    
+  - name: Nansen
+    careers_url: https://job-boards.greenhouse.io/nansen
+    enabled: true
+    
+  - name: Dune Analytics
+    careers_url: https://job-boards.greenhouse.io/duneanalytics
+    enabled: true
+  
+  # -- Gaming & NFT --
+  
+  - name: Animoca Brands
+    careers_url: https://job-boards.greenhouse.io/animocabrands
+    enabled: true
+    
+  - name: Immutable
+    careers_url: https://jobs.lever.co/immutable
+    enabled: true
+    
+  - name: Sky Mavis (Axie Infinity)
+    careers_url: https://job-boards.greenhouse.io/skymavis
+    enabled: true
+  
+  # -- VCs & Investment --
+  
+  - name: a16z crypto
+    careers_url: https://job-boards.greenhouse.io/a16z
+    enabled: false  # General a16z, filter crypto roles manually

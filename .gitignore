@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+node_modules/
+*.json.bak
+
+# Sensitive - never commit
+.env
+*.env
+
+# Debug/test files
+scripts/debug_*.js
+scripts/test_*.js
+scripts/test_*.py

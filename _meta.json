@@ -1,0 +1,7 @@
+{
+  "name": "job-scanner",
+  "version": "1.0.0",
+  "description": "Tự động tìm kiếm việc làm web3/crypto, lọc theo profile, update Google Sheet",
+  "author": "anhduong",
+  "skill_file": "SKILL.md"
+}

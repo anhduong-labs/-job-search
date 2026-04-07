@@ -29,15 +29,15 @@ def load_files():
 def should_pass(job, profile):
     """Binary decision: True = send to LLM, False = reject
     
-    REJECT if:
-    - Has exclude keywords (engineer, developer, etc.)
-    - Blocked location (Mexico, LatAm, Africa, etc.)
-    - No must-have keywords AND no nice-to-have keywords
+    STRICT location filter:
+    - ACCEPT: Fully Remote
+    - ACCEPT: APAC cities only (Singapore, Bangkok, Ho Chi Minh, Hong Kong, etc.)
+    - REJECT: Everything else (US, EU, Hybrid, On-site)
     
-    PASS if:
-    - Has ≥1 must-have keyword OR ≥2 nice-to-have keywords
-    - Location OK (Remote, APAC, or acceptable)
-    - No exclude keywords
+    Keyword filter (relaxed):
+    - If location OK → PASS (bỏ keyword requirement)
+    - If location BAD → REJECT (regardless of keywords)
+    - Exception: if has strong must-have keywords → PASS even if location is sub-optimal
     """
     title = (job.get("title") or "").lower()
     description = (job.get("description") or "").lower()
@@ -47,53 +47,42 @@ def should_pass(job, profile):
     # 1. CHECK EXCLUDE KEYWORDS (auto-reject)
     exclude_roles = profile.get("exclude_roles", [])
     for keyword in exclude_roles:
-        if keyword.lower() in title:  # Only check title for exclude keywords
+        if keyword.lower() in title:
             return False, f"Exclude keyword in title: {keyword}"
     
-    # 2. CHECK BLOCKED LOCATIONS (auto-reject)
-    blocked_locations = [
-        "mexico", "africa", "latam", "latin america", "south america",
-        "brazil", "argentina", "colombia", "nigeria", "kenya", "south africa",
-        "cairo", "lagos", "nairobi", "johannesburg"
+    # 2. STRICT LOCATION FILTER (whitelist approach)
+    # List of accepted remote keywords
+    remote_keywords = ["remote", "fully remote", "work from home", "distributed"]
+    is_remote = any(r in location for r in remote_keywords) or any(r in title for r in remote_keywords)
+    
+    # List of ACCEPTED APAC cities/regions
+    apac_cities = [
+        "singapore", "bangkok", "ho chi minh", "hcm", "hanoi", "vietnam",
+        "hong kong", "hk", "taipei", "taiwan", "seoul", "south korea",
+        "tokyo", "japan", "sydney", "australia", "dubai", "uae",
+        "kuala lumpur", "malaysia", "manila", "philippines", "jakarta", "indonesia",
+        "penang", "ang mo kio", "marina bay", "changi"
     ]
-    for loc in blocked_locations:
-        if loc in location:
-            return False, f"Blocked location: {loc}"
+    is_apac = any(city in location for city in apac_cities)
     
-    # 3. CHECK LOCATION PREFERENCE (must be Remote OR APAC)
-    remote_field = (job.get("remote") or "").lower()
-    is_remote = any(r in remote_field for r in ["remote", "fully remote", "work from home", "hybrid"])
+    # Rejection logic: HARD NO on non-remote non-APAC
+    if not is_remote and not is_apac:
+        return False, f"Location not Remote or APAC: {location}"
     
-    preferred_locations = profile.get("preferred_locations", [])
-    location_match = any(loc.lower() in location for loc in preferred_locations)
+    # 3. CHECK EXCLUDE ROLES AGAIN (in description)
+    for keyword in exclude_roles:
+        if keyword.lower() in title:
+            return False, f"Exclude keyword found: {keyword}"
     
-    if not (is_remote or location_match):
-        # Allow US/Europe remote jobs, but reject non-remote non-APAC
-        if not is_remote and location not in ["", "remote"]:
-            # Check if it's a major city we should reject
-            non_apac_cities = [
-                "berlin", "paris", "london", "new york", "chicago", "san francisco",
-                "dubai", "istanbul", "moscow", "mumbai", "tokyo", "sydney",
-                "toronto", "vancouver", "montreal"
-            ]
-            if any(city in location for city in non_apac_cities):
-                return False, f"Non-APAC city: {location}"
+    # 4. ACCEPTANCE LOGIC
+    # If location is good (remote OR apac) → PASS
+    # (We'll let LLM decide if it's actually a good fit)
+    if is_remote or is_apac:
+        location_status = "Remote" if is_remote else f"APAC ({location})"
+        return True, f"Location OK: {location_status}"
     
-    # 4. CHECK MUST-HAVE KEYWORDS (preferred_roles)
-    preferred_roles = profile.get("preferred_roles", [])
-    role_match = sum(1 for kw in preferred_roles if kw.lower() in text)
-    
-    # 5. CHECK NICE-TO-HAVE KEYWORDS (preferred_domains)
-    preferred_domains = profile.get("preferred_domains", [])
-    domain_match = sum(1 for kw in preferred_domains if kw.lower() in text)
-    
-    # PASS criteria: ≥1 role match OR ≥1 domain match
-    if role_match >= 1:
-        return True, f"Has {role_match} role keywords"
-    elif domain_match >= 1:
-        return True, f"Has {domain_match} domain keywords"
-    else:
-        return False, f"Insufficient keywords (role: {role_match}, domain: {domain_match})"
+    # Should not reach here, but as fallback
+    return False, f"Location check failed: {location}"
 
 def main():
     print("🔍 Binary keyword filter (Pass/Reject)...")

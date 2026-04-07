@@ -11,6 +11,12 @@ import os
 import time
 from openai import OpenAI
 from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
+
+# Load .env from job-scanner skill directory
+env_path = os.path.expanduser("~/.openclaw/skills/job-scanner/.env")
+if os.path.exists(env_path):
+    load_dotenv(env_path)
 
 WORKSPACE = os.path.expanduser("~/.openclaw/workspace")
 INPUT_FILE = os.path.join(WORKSPACE, "jobs_filtered.json")

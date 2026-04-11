@@ -1,37 +1,39 @@
 ---
 name: job-scanner
-description: "Tự động tìm kiếm việc làm web3/crypto từ nhiều nguồn, lọc theo profile của Duong, và update vào Google Sheet. Dùng khi: (1) được yêu cầu tìm việc, scan job, chạy job scanner, (2) cron job kích hoạt lúc 7h sáng, (3) nhận link job thủ công qua Telegram."
----
----
-name: job-scanner
-description: "Tự động tìm kiếm việc làm web3/crypto, lọc theo profile, update Google Sheet. Dùng khi được yêu cầu tìm việc, scan job, hoặc cron job kích hoạt."
+description: "Tự động tìm kiếm việc làm web3/crypto từ nhiều nguồn, lọc theo profile của Duong, và update vào Google Sheet. Dùng khi: (1) được yêu cầu tìm việc, scan job, chạy job scanner, (2) cron job kích hoạt lúc 9h sáng (UTC+7), (3) nhận link job thủ công qua Telegram."
 ---
 
 # Job Scanner Skill
 
 ## Mô tả
-Tự động tìm kiếm việc làm web3/crypto từ nhiều nguồn, lọc theo profile của Duong, và update vào Google Sheet mỗi ngày.
+Tự động tìm kiếm việc làm web3/crypto từ nhiều nguồn, filter theo role + location, score và sort rồi update vào Google Sheet.
 
 ## Khi nào dùng skill này
-- Khi được yêu cầu "tìm việc", "scan job", "chạy job scanner"
-- Khi cron job kích hoạt lúc 7h sáng
-- Khi nhận link job thủ công qua Telegram
+- Khi được yêu cầu "tìm việc", "scan job", "chạy job scanner", "update job lên sheet"
+- Khi cron job kích hoạt lúc 9h sáng (UTC+7)
 
 ---
 
-## Files quan trọng
+## Scripts (chỉ 3 file đang dùng)
+
+| Script | Mục đích |
+|--------|----------|
+| `scripts/crawl.py` | Crawl jobs từ LinkedIn + Indeed + Lever |
+| `scripts/filter.py` | Filter theo role/location + scoring 0-100 |
+| `scripts/update_sheet.py` | Push lên Google Sheet, sort theo score |
+| `scripts/validate_output.py` | Debug utility (optional) |
+
+## Output files
 
 | File | Mục đích |
 |------|----------|
-| `~/.openclaw/workspace/scan_job_candidate_profile.json` | Profile tiêu chí lọc |
-| `~/.openclaw/workspace/scan_job_source_registry.json` | Danh sách nguồn |
 | `~/.openclaw/workspace/jobs_raw.json` | Output của crawl.py |
-| `~/.openclaw/workspace/jobs_filtered.json` | Output của filter.py |
+| `~/.openclaw/workspace/jobs_filtered.json` | Output của filter.py (flat list, sorted) |
 | `~/.openclaw/workspace/job_scan_last_run.json` | Summary lần chạy cuối |
 
 ---
 
-## Workflow chính (Auto scan hàng ngày)
+## Workflow chính
 
 Chạy theo thứ tự sau, KHÔNG bỏ bước nào:
 
@@ -39,51 +41,44 @@ Chạy theo thứ tự sau, KHÔNG bỏ bước nào:
 ```bash
 cd ~/.openclaw/skills/job-scanner && ~/.openclaw/workspace/jobspy-env/bin/python3 scripts/crawl.py
 ```
-- Crawl từ: web3career, cryptojobslist, LinkedIn (JobSpy)
-- Output: `jobs_raw.json`
-- Nếu lỗi: ghi log và tiếp tục bước 2 với data cũ nếu có
+- Keywords: `web3`, `crypto`, `blockchain`
+- Locations: Remote, Ho Chi Minh City, Hanoi, Singapore, Bangkok, Hong Kong
+- Nguồn: LinkedIn + Indeed (JobSpy) + Lever (Binance, Immutable)
+- Output: `jobs_raw.json` (~250-320 jobs)
 
 ### Bước 2 — Filter & Score
 ```bash
 cd ~/.openclaw/skills/job-scanner && ~/.openclaw/workspace/jobspy-env/bin/python3 scripts/filter.py
 ```
-- Đọc `jobs_raw.json`
-- Filter: chỉ giữ Remote/APAC + role Product/Growth/Research/Analyst
-- Loại: Engineering/HR/Legal/C-level
-- Score từng job còn lại (0-100) và sort cao → thấp
-- Output: `jobs_filtered.json` (flat list)
+- ✅ Giữ: role Product/Growth/Research/Analyst/BD/Marketing
+- ✅ Giữ: location Remote (không gắn US/EU) hoặc APAC
+- ❌ Loại: Engineering/HR/Legal/C-level
+- ❌ Loại: "Remote, US" / "Remote, UK" / Non-APAC
+- Score 0-100, sort cao → thấp
+- Output: `jobs_filtered.json` (~60-90 jobs)
 
 ### Bước 3 — Update Sheet
 ```bash
-cd ~/.openclaw/skills/job-scanner && ~/.openclaw/workspace/jobspy-env/bin/python3 scripts/update_sheet.py
+cd ~/.openclaw/skills/job-scanner && JOB_SHEET_ID=1NHXD3e4TZYhEcdaEhx1tJZYVlUfhQMpBze_vy5SesJ8 ~/.openclaw/workspace/jobspy-env/bin/python3 scripts/update_sheet.py
 ```
-- Đọc `jobs_filtered.json` (đã sort theo score)
-- Gửi tất cả vào 1 tab `scan_job` (không chia 2 tab)
-- Thứ tự trên sheet = thứ tự score (job tốt nhất lên đầu)
+- Push vào 1 tab duy nhất: `scan_job`
+- Skip duplicate theo URL
+- Thứ tự trên sheet = score cao nhất lên đầu
 - Output: `job_scan_last_run.json`
 
 ### Bước 4 — Báo cáo Telegram
-Sau khi update sheet xong, đọc `job_scan_last_run.json` và nhắn báo cáo theo format:
+Sau khi xong, đọc `job_scan_last_run.json` và báo cáo:
 ```
 📊 Job Scan hoàn thành - [DATE]
 
-✅ Main fit: [N] jobs → scan_job
-📋 Low fit: [N] jobs → scan_job_lowfit
-❌ Rejected: [N] jobs
+✅ [N] jobs mới đã push lên sheet
+↩️ [N] duplicates skip
+❌ [N] lỗi
 
-Top 3 main fit:
-1. [Title] @ [Company] — Score: [N]
-2. [Title] @ [Company] — Score: [N]
-3. [Title] @ [Company] — Score: [N]
-```
-
----
-
-## Workflow thủ công (Nhận link qua Telegram)
-
-Khi Duong gửi link job qua Telegram:
-```bash
-cd ~/.openclaw/workspace && python3 job-processor.py [URL]
+🏆 Top 3:
+1. [Title] @ [Company]
+2. [Title] @ [Company]
+3. [Title] @ [Company]
 ```
 
 ---
@@ -92,10 +87,10 @@ cd ~/.openclaw/workspace && python3 job-processor.py [URL]
 
 | Lỗi | Cách xử lý |
 |-----|-----------|
-| Crawl thất bại 1 nguồn | Tiếp tục với các nguồn khác, ghi log |
-| `jobs_raw.json` trống | Dừng, báo cáo lỗi qua Telegram |
-| Apps Script timeout | Retry 1 lần, nếu vẫn lỗi báo cáo |
-| JobSpy not installed | Bỏ qua LinkedIn, dùng 2 nguồn còn lại |
+| Crawl thất bại 1 nguồn | Tiếp tục với nguồn khác, ghi log |
+| `jobs_raw.json` trống | Dừng, báo lỗi qua Telegram |
+| Lever timeout | Bỏ qua, LinkedIn/Indeed vẫn chạy |
+| `JOB_SHEET_ID` trống | Đọc từ `~/.openclaw/workspace/.env` |
 
 ---
 
@@ -103,11 +98,10 @@ cd ~/.openclaw/workspace && python3 job-processor.py [URL]
 
 | Tiêu chí | Điểm tối đa |
 |----------|-------------|
-| Role match (preferred_roles) | 40đ |
-| Domain match (web3/crypto) | 30đ |
-| Location match (Remote/APAC) | 20đ |
-| Seniority match | 10đ |
-| Excluded role | -30đ |
-| C-level (CEO/CTO/CFO) | -20đ |
+| Role match (research/analyst/product/growth) | 30đ |
+| Location match (Remote/APAC city) | 30đ |
+| Web3/crypto relevance trong description | 20đ |
+| Seniority (senior/lead/head) | +10đ |
+| Junior/intern | -10đ |
 
-Ngưỡng: main_fit >= 60, low_fit >= 40, rejected < 40
+Tất cả jobs pass filter đều lên sheet, sort theo score.

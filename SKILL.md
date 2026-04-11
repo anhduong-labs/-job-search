@@ -45,20 +45,21 @@ cd ~/.openclaw/skills/job-scanner && ~/.openclaw/workspace/jobspy-env/bin/python
 
 ### Bước 2 — Filter & Score
 ```bash
-cd ~/.openclaw/skills/job-scanner && python3 scripts/filter.py
+cd ~/.openclaw/skills/job-scanner && ~/.openclaw/workspace/jobspy-env/bin/python3 scripts/filter.py
 ```
-- Đọc `jobs_raw.json` + `scan_job_candidate_profile.json`
-- Score từng job từ 0-100
-- Chia thành main_fit (>=60) và low_fit (>=40)
-- Output: `jobs_filtered.json`
+- Đọc `jobs_raw.json`
+- Filter: chỉ giữ Remote/APAC + role Product/Growth/Research/Analyst
+- Loại: Engineering/HR/Legal/C-level
+- Score từng job còn lại (0-100) và sort cao → thấp
+- Output: `jobs_filtered.json` (flat list)
 
 ### Bước 3 — Update Sheet
 ```bash
-cd ~/.openclaw/skills/job-scanner && python3 scripts/update_sheet.py
+cd ~/.openclaw/skills/job-scanner && ~/.openclaw/workspace/jobspy-env/bin/python3 scripts/update_sheet.py
 ```
-- Đọc `jobs_filtered.json`
-- Gửi main_fit → tab `scan_job`
-- Gửi low_fit → tab `scan_job_lowfit`
+- Đọc `jobs_filtered.json` (đã sort theo score)
+- Gửi tất cả vào 1 tab `scan_job` (không chia 2 tab)
+- Thứ tự trên sheet = thứ tự score (job tốt nhất lên đầu)
 - Output: `job_scan_last_run.json`
 
 ### Bước 4 — Báo cáo Telegram

@@ -63,44 +63,15 @@ def crawl_web3career(profile):
     return jobs
 
 def crawl_cryptojobslist(profile):
-    """Crawl cryptojobslist.com"""
-    print("  🌐 Crawling cryptojobslist.com...")
-    jobs = []
-    try:
-        url = "https://cryptojobslist.com"
-        req = Request(url, headers={
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Connection': 'keep-alive',
-        })
-        with urlopen(req, timeout=15) as res:
-            html = res.read().decode("utf-8")
+    """Crawl cryptojobslist.com
 
-        # Extract job listings
-        title_pattern = r'<h2[^>]*>(.*?)</h2>'
-        company_pattern = r'class="company[^"]*"[^>]*>(.*?)<'
-        titles = re.findall(title_pattern, html, re.DOTALL)
-        companies = re.findall(company_pattern, html, re.DOTALL)
+    Previously this function added the homepage/listing as a fake "job" with an
+    empty description. That pollutes downstream scoring/evaluation.
 
-        for i, title in enumerate(titles[:5]):
-            clean_title = re.sub(r"<[^>]+>", "", title).strip()
-            clean_company = re.sub(r"<[^>]+>", "", companies[i]).strip() if i < len(companies) else "Unknown"
-            if clean_title:
-                jobs.append({
-                    "source": "cryptojobslist",
-                    "title": clean_title,
-                    "company": clean_company,
-                    "location": "Remote",
-                    "url": url,
-                    "date_crawled": datetime.now().strftime("%Y-%m-%d"),
-                    "date_posted": "",
-                    "salary": "",
-                    "description": ""
-                })
-    except Exception as e:
-        print(f"    ⚠️  cryptojobslist error: {e}")
-    return jobs
+    Until we implement per-job detail extraction, we skip this source.
+    """
+    print("  ⏭️  Skipping cryptojobslist.com (detail parsing not implemented)")
+    return []
 
 def crawl_jobspy(profile):
     """Crawl qua JobSpy (LinkedIn, Indeed, Google, v.v.)"""
@@ -110,74 +81,90 @@ def crawl_jobspy(profile):
         from jobspy import scrape_jobs
         import pandas as pd
 
-        # Tạo keywords phong phú hơn
-        key_roles = [
-            "research", "analyst", "ecosystem",
-            "growth", "product", "product manager",
-            "marketing", "community manager"
+        keywords = ["web3", "crypto", "blockchain"]
+        search_locations = [
+            "Remote",
+            "Ho Chi Minh City, Vietnam",
+            "Hanoi, Vietnam",
+            "Singapore",
+            "Bangkok, Thailand",
+            "Hong Kong",
         ]
-        key_domains = ["web3", "crypto", "blockchain", "defi", "l1", "l2", "nft"]
-
-        keywords = []
-        for role in key_roles:
-            for domain in key_domains[:3]: # Mix role với top 3 domains
-                keywords.append(f"{role} {domain}")
-        
-        # Thêm keywords đơn lẻ quan trọng
-        keywords += ["web3 marketing", "crypto analyst", "blockchain research", "growth lead crypto"]
-
-        # Bỏ trùng, giới hạn 15 keywords (đủ cover các role quan trọng)
-        keywords = list(dict.fromkeys(keywords))[:15]
 
         for keyword in keywords:
-            try:
-                # Crawl từ LinkedIn, Indeed, Google
-                # Note: linkedin_fetch_description=False để tránh crash NoneType error
-                result = scrape_jobs(
-                    site_name=["linkedin", "indeed", "google"],
-                    search_term=keyword,
-                    location="Remote",
-                    results_wanted=20, # Tăng số lượng kết quả mỗi keyword
-                    linkedin_fetch_description=False,  # Tắt description để tránh crash, có thể fetch sau từ URL
-                    hours_old=168 # Chỉ lấy jobs mới trong 7 ngày qua
-                )
-                if result is None or result.empty:
-                    continue
-                    
-                for _, row in result.iterrows():
-                    if row is None:
+            for location_target in search_locations:
+                try:
+                    result = scrape_jobs(
+                        site_name=["linkedin", "indeed"],
+                        search_term=keyword,
+                        location=location_target,
+                        results_wanted=20,
+                        linkedin_fetch_description=False,
+                        hours_old=168
+                    )
+                    if result is None or result.empty:
                         continue
-                    source = str(row.get("site", "jobspy")) if row.get("site") else "jobspy"
-                    jobs.append({
-                        "source": source,
-                        "title": str(row.get("title", "")),
-                        "company": str(row.get("company", "")),
-                        "location": str(row.get("location", "Remote")),
-                        "url": str(row.get("job_url", "")),
-                        "date_crawled": datetime.now().strftime("%Y-%m-%d"),
-                        "date_posted": str(row.get("date_posted", "")),
-                        "salary": str(row.get("min_amount", "")),
-                        "description": str(row.get("description", ""))[:800] # Lấy desc dài hơn để filter tốt hơn
-                    })
-                print(f"    ✅ JobSpy keyword '{keyword}': +{len(result)} jobs")
-            except Exception as e:
-                print(f"    ⚠️  JobSpy keyword '{keyword}': {e}")
+
+                    for _, row in result.iterrows():
+                        if row is None:
+                            continue
+                        source = str(row.get("site", "jobspy")) if row.get("site") else "jobspy"
+                        jobs.append({
+                            "source": source,
+                            "title": str(row.get("title", "")),
+                            "company": str(row.get("company", "")),
+                            "location": str(row.get("location", location_target)),
+                            "url": str(row.get("job_url", "")),
+                            "date_crawled": datetime.now().strftime("%Y-%m-%d"),
+                            "date_posted": str(row.get("date_posted", "")),
+                            "salary": str(row.get("min_amount", "")),
+                            "description": str(row.get("description", ""))[:800]
+                        })
+                    print(f"    ✅ [{keyword}][{location_target}]: +{len(result)} jobs")
+                except Exception as e:
+                    print(f"    ⚠️  [{keyword}][{location_target}]: {e}")
 
     except ImportError:
         print("    ⚠️  JobSpy not installed, skipping")
     return jobs
 
 def crawl_lever(profile):
-    """Crawl từ Lever companies (Binance, Uniswap, Aave, Chainlink, Kraken, Immutable)"""
+    """Crawl từ Lever companies (Binance, Uniswap, Aave, Chainlink, Kraken, Immutable)
+
+    Goal: produce a non-empty description/snippet per job (for downstream role-quality scoring)
+    without fetching too much (keep it lightweight).
+    """
     print("  🏢 Crawling Lever companies...")
     jobs = []
-    
+
     try:
         from bs4 import BeautifulSoup
     except ImportError:
         print("    ⚠️  BeautifulSoup not installed, skipping Lever crawl")
         return jobs
-    
+
+    def fetch_html(u: str) -> str:
+        req = Request(u, headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Connection': 'keep-alive',
+            'Referer': 'https://jobs.lever.co/',
+        })
+        with urlopen(req, timeout=20) as res:
+            return res.read().decode('utf-8', errors='ignore')
+
+    def extract_lever_snippet(job_html: str, max_chars: int = 600) -> str:
+        soup = BeautifulSoup(job_html, 'html.parser')
+        # Lever job page: main content is usually inside .content or .posting
+        container = soup.find('div', class_=re.compile(r"content|posting")) or soup.body
+        if not container:
+            return ""
+        text = container.get_text("\n", strip=True)
+        # Basic cleanup
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text[:max_chars]
+
     lever_companies = [
         ("Binance", "https://jobs.lever.co/binance"),
         ("Kraken", "https://jobs.lever.co/kraken"),
@@ -186,75 +173,92 @@ def crawl_lever(profile):
         ("Chainlink", "https://jobs.lever.co/chainlink"),
         ("Immutable", "https://jobs.lever.co/immutable"),
     ]
-    
+
+    # Limit per company to avoid heavy crawling
+    per_company_limit = int(os.getenv('LEVER_LIMIT_PER_COMPANY', '60'))
+
     for company_name, url in lever_companies:
         try:
-            req = Request(url, headers={
-                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Connection': 'keep-alive',
-                'Referer': 'https://jobs.lever.co/',
-            })
-            with urlopen(req, timeout=15) as res:
-                html = res.read().decode("utf-8")
-            
+            html = fetch_html(url)
             soup = BeautifulSoup(html, 'html.parser')
-            
-            # Lever job postings are in divs with exact class 'posting'
+
             postings = soup.find_all('div', class_='posting')
-            
             if not postings:
-                # Fallback: try with regex if exact match fails
                 postings = soup.find_all('div', class_=lambda x: x and 'posting' in x)
-            
-            for posting in postings:  # Get ALL postings (no limit)
+
+            count = 0
+            for posting in postings:
+                if count >= per_company_limit:
+                    break
                 try:
-                    # Extract title
-                    title_elem = posting.find(['h2', 'a'], class_=re.compile('title|posting'))
-                    if not title_elem:
-                        title_elem = posting.find('h2')
-                    
-                    if not title_elem:
-                        title_elem = posting.find('a')
-                    
-                    title = title_elem.get_text(strip=True) if title_elem else None
-                    
-                    # Extract location
+                    # Lever listings: 'Apply' button is not the title. Real title often in .posting-title / h5.
+                    title_elem = (
+                        posting.find('a', class_=re.compile(r"posting-title"))
+                        or posting.find('h5')
+                        or posting.find(['h2', 'a'], class_=re.compile('title|posting'))
+                    )
+                    title = title_elem.get_text(" ", strip=True) if title_elem else None
+                    if title:
+                        title = re.sub(r"\bRemote\s*[—-].*$", "", title).strip()  # remove trailing location stub
+                        if title.lower() == 'apply':
+                            title = None
+
                     location_elem = posting.find(['span', 'div'], class_=re.compile('location|category'))
                     location = location_elem.get_text(strip=True) if location_elem else "Unknown"
-                    
-                    # Extract job URL if available
+
                     link_elem = posting.find('a', href=True)
                     job_url = link_elem['href'] if link_elem else url
                     if job_url and not job_url.startswith('http'):
                         job_url = url.rstrip('/') + '/' + job_url.lstrip('/')
-                    
-                    if title and title.strip():
-                        jobs.append({
-                            "source": "lever",
-                            "title": title.strip(),
-                            "company": company_name,
-                            "location": location.strip() if location else "Unknown",
-                            "url": job_url or url,
-                            "date_crawled": datetime.now().strftime("%Y-%m-%d"),
-                            "date_posted": "",
-                            "salary": "",
-                            "description": ""
+
+                    if not (title and title.strip() and job_url):
+                        continue
+
+                    # Fetch snippet via Lever API (fast + stable)
+                    snippet = ""
+                    try:
+                        # Lever API returns rich plain text fields for most postings
+                        api_url = f"https://api.lever.co/v0/postings/{url.split('/')[-1]}/{job_url.rstrip('/').split('/')[-1]}?mode=json"
+                        api_req = Request(api_url, headers={
+                            'User-Agent': 'Mozilla/5.0',
+                            'Accept': 'application/json'
                         })
-                except Exception as e:
-                    # Skip individual posting on error
+                        import json as _json
+                        api_data = _json.loads(urlopen(api_req, timeout=20).read().decode('utf-8','ignore'))
+                        snippet = (api_data.get('descriptionPlain') or api_data.get('descriptionBodyPlain') or api_data.get('additionalPlain') or '')
+                        snippet = snippet.strip().replace('\u00a0',' ')
+                        snippet = snippet[:600]
+                    except Exception:
+                        # fallback to HTML parsing
+                        try:
+                            job_html = fetch_html(job_url)
+                            snippet = extract_lever_snippet(job_html)
+                        except Exception:
+                            snippet = ""
+
+                    jobs.append({
+                        "source": "lever",
+                        "title": title.strip(),
+                        "company": company_name,
+                        "location": location.strip() if location else "Unknown",
+                        "url": job_url,
+                        "date_crawled": datetime.now().strftime("%Y-%m-%d"),
+                        "date_posted": "",
+                        "salary": "",
+                        "description": snippet
+                    })
+                    count += 1
+                except Exception:
                     pass
-            
-            company_count = len([j for j in jobs if j['company']==company_name])
-            if company_count > 0:
-                print(f"    ✅ {company_name}: {company_count} jobs")
+
+            if count > 0:
+                print(f"    ✅ {company_name}: {count} jobs")
             else:
                 print(f"    ⚠️  {company_name}: No jobs found")
-                
+
         except Exception as e:
             print(f"    ⚠️  {company_name} error: {e}")
-    
+
     return jobs
 
 def deduplicate(jobs):

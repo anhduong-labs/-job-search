@@ -139,11 +139,17 @@ def main():
     print("📤 Bắt đầu update Google Sheet qua Google Sheets API...")
     print()
 
-    # Load jobs
+    # Load jobs (flat list, đã sort theo score từ filter.py)
     with open(INPUT_FILE) as f:
         data = json.load(f)
 
-    all_jobs = data.get("main_fit", []) + data.get("low_fit", [])
+    # Support cả flat list (new) và old dict format
+    if isinstance(data, list):
+        all_jobs = data
+    else:
+        all_jobs = data.get("main_fit", []) + data.get("low_fit", [])
+    
+    # Đảm bảo sort theo score cao → thấp
     all_jobs.sort(key=lambda x: x.get("fit_score", 0), reverse=True)
 
     # Authenticate
